@@ -1,5 +1,7 @@
 # CLAUDE.md
 
+> **Note:** This file originates from the upstream `marktext/marktext` repository. It is retained for reference but is not actively used for the `lema-markdown` project.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 # MarkText
