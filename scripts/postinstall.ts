@@ -50,7 +50,7 @@ if (!fs.existsSync(nativeKeymapDir)) {
   // native-keymap is already in marktext's optionalDependencies; the add
   // re-installs without changing the version range.
   if (isPnpm) {
-    run('pnpm --filter marktext add native-keymap --ignore-scripts')
+    run('pnpm --filter lema-markdown add native-keymap --ignore-scripts')
   } else {
     run('npm install native-keymap --ignore-scripts --no-save', { cwd: desktopRoot })
   }
@@ -153,7 +153,12 @@ run(`"${patchPackageBin}"`, { cwd: desktopRoot })
 
 // ── 4. Rebuild native modules for Electron ABI ──────────────────────────────
 console.log('Rebuilding native modules for Electron...')
-run(`"${electronRebuildBin}" -f`, { cwd: desktopRoot })
+try {
+  run(`"${electronRebuildBin}" -f`, { cwd: desktopRoot })
+} catch {
+  console.warn('Native module rebuild skipped (no VS Build Tools or compilation failed).')
+  console.warn('Optional native modules (ced, keytar, native-keymap) will use fallbacks.')
+}
 
 // ── 5. Generate minified locale files ───────────────────────────────────────
 console.log('Minifying locales...')

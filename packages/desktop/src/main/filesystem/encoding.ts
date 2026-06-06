@@ -1,5 +1,12 @@
-import ced from 'ced'
 import type { Encoding } from 'common/encoding'
+
+let ced: ((buffer: Buffer) => string) | null = null
+try {
+  const cedMod = await import('ced')
+  ced = cedMod.default ?? cedMod
+} catch {
+  // ced is optional; encoding detection falls back to UTF-8
+}
 
 const CED_ICONV_ENCODINGS: Record<string, string> = {
   'BIG5-CP950': 'big5',
@@ -48,7 +55,7 @@ export const guessEncoding = (buffer: Buffer, autoGuessEncoding: boolean): Encod
   }
 
   // Auto guess encoding, otherwise use UTF-8.
-  if (autoGuessEncoding) {
+  if (autoGuessEncoding && ced) {
     encoding = ced(buffer)
     if (CED_ICONV_ENCODINGS[encoding]) {
       encoding = CED_ICONV_ENCODINGS[encoding]

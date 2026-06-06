@@ -1,7 +1,6 @@
 import fs from 'fs'
 import path from 'path'
 import { BrowserWindow, dialog, ipcMain } from 'electron'
-import keytar from 'keytar'
 import schema from './schema.json'
 import Store from 'electron-store'
 import log from 'electron-log'
@@ -18,6 +17,28 @@ type DataCenterEvents = Record<string, unknown[]>
 interface DataCenterPaths {
   dataCenterPath: string
   userDataPath: string
+}
+
+let keytar: typeof import('keytar') | null = null
+try {
+  const keytarMod = await import('keytar')
+  keytar = keytarMod.default ?? keytarMod
+} catch {
+  // keytar is optional; passwords fall back to insecure electron-store
+}
+
+const getKeytar = () => {
+  if (keytar) return keytar
+  // Fallback for development when keytar is not available (e.g. missing native build tools)
+  const fallbackStore = new Store<any>({ name: 'insecure-passwords' })
+  return {
+    getPassword: async (service: string, account: string): Promise<string | null> => {
+      return fallbackStore.get(`${service}.${account}`) ?? null
+    },
+    setPassword: async (service: string, account: string, password: string): Promise<void> => {
+      fallbackStore.set(`${service}.${account}`, password)
+    }
+  }
 }
 
 class DataCenter extends TypedEmitter<DataCenterEvents> {
@@ -77,9 +98,10 @@ class DataCenter extends TypedEmitter<DataCenterEvents> {
     const { serviceName, encryptKeys } = this
     const data = this.store.store
     try {
+      const k = getKeytar()
       const encryptData = await Promise.all(
         encryptKeys.map((key) => {
-          return keytar.getPassword(serviceName, key)
+          return k.getPassword(serviceName, key)
         })
       )
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -128,7 +150,7 @@ class DataCenter extends TypedEmitter<DataCenterEvents> {
   getItem(key: string): Promise<any> | any {
     const { encryptKeys, serviceName } = this
     if (encryptKeys.includes(key)) {
-      return keytar.getPassword(serviceName, key)
+      return getKeytar().getPassword(serviceName, key)
     } else {
       const value = this.store.get(key)
       return Promise.resolve(value)
@@ -144,7 +166,7 @@ class DataCenter extends TypedEmitter<DataCenterEvents> {
     ipcMain.emit('broadcast-user-data-changed', { [key]: value })
     if (encryptKeys.includes(key)) {
       try {
-        return await keytar.setPassword(serviceName, key, value)
+        return await getKeytar().setPassword(serviceName, key, value)
       } catch (err) {
         log.error('Keytar error:', err)
       }
